@@ -65,3 +65,24 @@ docker_container_labels_load() {
 docker_container_labels_get() {
     jq -r ".[\"$1\"] | select (. != null)" <(echo "$CONTAINER_LABELS")
 }
+
+docker_container_get_internal_iface() {
+    CONTAINER_ID="$1"
+    NETWORK_NAME="$2"
+    docker exec "$CONTAINER_ID" sh -c "ip -o link show | grep -E 'veth.*br-$NETWORK_NAME' | awk '{print \$2}' | sed 's/://'"
+}
+
+docker_container_init_internal() {
+    CONTAINER_ID="$1"
+    CONTAINER_PID=$(docker inspect $CONTAINER_ID -f '{{.State.Pid}}')
+    ln -sfT /proc/$CONTAINER_PID/ns/net /var/run/netns/$CONTAINER_ID
+}
+
+# execute a command in the container's network namespace
+# first parameter is the container ID
+# the rest is the command to execute, e.g.: tc qdisc add dev eth0 root netem delay 100ms
+docker_container_internal_netns_exec() {
+    CONTAINER_ID="$1"
+    shift
+    ip netns exec $CONTAINER_ID "$@"
+}
