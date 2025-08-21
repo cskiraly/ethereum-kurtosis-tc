@@ -9,7 +9,8 @@ qdisc_del() {
     tc qdisc del dev "$1" root
 }
 qdisc_next() {
-    QDISC_HANDLE="parent $QDISC_ID: handle $((QDISC_ID+1)):"
+    CLASS=$1
+    QDISC_HANDLE="parent $QDISC_ID:$CLASS handle $((QDISC_ID+1)):"
     ((QDISC_ID++))
 }
 # Following calls to qdisc_netm and qdisc_tbf are chained together
