@@ -14,38 +14,99 @@ get_cl_containers() {
     docker ps -q --filter "name=^cl-"
 }
 
+get_containers_by_pattern() {
+    docker ps -q --filter "name=$1"
+}
+
 echo "EL containers:"
 get_el_containers
 
 echo "CL containers:"
 get_cl_containers
 
+#process commmand line arguments
+# Options
+# -e: apply to EL containers
+# -c: apply to CL containers
+# -i: include also containers with this pattern in their name
+# --delay: set delay
+# --loss: set loss
+# --corrupt: set corrupt
+# --duplicate: set duplicate
+# --reorder: set reorder
+# --downlink: set downlink rate
+# --uplink: set uplink rate
+# --help: show this help message
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo "Options:"
+    echo "  -e, --el                  Apply to EL containers"
+    echo "  -c, --cl                  Apply to CL containers"
+    echo "  -i, --include PATTERN     Include containers with this pattern in their name"
+    echo "  --delay DELAY             Set delay (e.g., 50ms)"
+    echo "  --loss LOSS               Set loss (e.g., 1%)"
+    echo "  --corrupt CORRUPT         Set corrupt (e.g., 0.1%)"
+    echo "  --duplicate DUPLICATE     Set duplicate (e.g., 0.1%)"
+    echo "  --reorder REORDER         Set reorder (e.g., 0.1%)"
+    echo "  --downlink DOWNLINK       Set downlink rate (e.g., 50mbit)"
+    echo "  --uplink UPLINK           Set uplink rate (e.g., 20mbit)"
+    echo "  --help                    Show this help message"
+}
+
 NETM_OPTIONS=
 DOWNLINK_TBF_OPTIONS=
 UPLINK_TBF_OPTIONS=
 OPTIONS_LOG=
-query="$1"
-while read -r param; do
-    FIELD="${param%%=*}"
-    VALUE="${param#*=}"
 
-    case "$FIELD" in
-        delay|loss|corrupt|duplicate|reorder)
-            NETM_OPTIONS+="$FIELD $VALUE "
-            ;;
-        downlink)
-            DOWNLINK_TBF_OPTIONS+="rate $VALUE "
-            ;;
-        uplink)
-            UPLINK_TBF_OPTIONS+="rate $VALUE "
+# Parse command line arguments using getopts
+while getopts "eci:-:" opt; do
+    case $opt in
+        e) EL_CONTAINERS=true ;;
+        c) CL_CONTAINERS=true ;;
+        i) INCLUDE_PATTERN="$OPTARG" ;;
+        -)
+            case $OPTARG in
+                el) EL_CONTAINERS=true ;;
+                cl) CL_CONTAINERS=true ;;
+                include=*) INCLUDE_PATTERN=${OPTARG#*=} ;;
+                delay=*) NETM_OPTIONS+="delay ${OPTARG#*=} " ;;
+                loss=*) NETM_OPTIONS+="loss ${OPTARG#*=} " ;;
+                corrupt=*) NETM_OPTIONS+="corrupt ${OPTARG#*=} " ;;
+                duplicate=*) NETM_OPTIONS+="duplicate ${OPTARG#*=} " ;;
+                reorder=*) NETM_OPTIONS+="reorder ${OPTARG#*=} " ;;
+                downlink=*) DOWNLINK_TBF_OPTIONS="rate ${OPTARG#*=} " ;;
+                uplink=*) UPLINK_TBF_OPTIONS="rate ${OPTARG#*=} " ;;
+                help) show_help; exit 0 ;;
+                *) echo "Unknown option: $OPTARG"; show_help; exit 1 ;;
+            esac
             ;;
         *)
-            echo "Error: Invalid field $FIELD"
+            echo "Unknown option: -$opt"
+            show_help
             exit 1
             ;;
     esac
-    OPTIONS_LOG+="$FIELD=$VALUE, "
-done < <(echo -e "$query" | tr '&' $'\n')
+done
+
+# select containers based on options
+CONTAINER_IDS=""
+if [ -z "$EL_CONTAINERS" ] && [ -z "$CL_CONTAINERS" ] && [ -z "$INCLUDE_PATTERN" ]; then
+    echo "Error: No containers selected. Use -e, -c, or -i options."
+    exit 1
+fi
+if [ "$EL_CONTAINERS" = true ]; then
+    CONTAINER_IDS+="$(get_el_containers) "
+fi
+if [ "$CL_CONTAINERS" = true ]; then
+    CONTAINER_IDS+="$(get_cl_containers) "
+fi
+if [ -n "$INCLUDE_PATTERN" ]; then
+    CONTAINER_IDS+=$(get_containers_by_pattern "$INCLUDE_PATTERN")
+fi
+if [ -z "$CONTAINER_IDS" ]; then
+    echo "No containers found matching the criteria."
+    exit 0
+fi
 
 echo "NETM_OPTIONS: $NETM_OPTIONS"
 echo "DOWNLINK_TBF_OPTIONS: $DOWNLINK_TBF_OPTIONS"
@@ -135,5 +196,5 @@ while read -r CONTAINER_ID; do
             tc qdisc add dev "$IF" parent 1:2 handle 20: tbf burst 5kb latency 50ms $UPLINK_TBF_OPTIONS
     fi
 
-done < <(get_el_containers)
+done < <(echo -e "$CONTAINER_IDS")
 

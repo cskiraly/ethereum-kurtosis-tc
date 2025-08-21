@@ -13,15 +13,20 @@ kurtosis run github.com/ethpandaops/ethereum-package --args-file downloaded_demo
 ```
 
 Control EL node resources by setting uplink, downlink, and/or delay at any time. Changes are applied immediately.
+```
+sudo bin/kurtosis-tc.sh -e --downlink=50mbit --uplink=20mbit --delay=50ms
+```
+
 Parameters are optional: if not specified, values are reset to non-limited on every new invocation.
+```
+sudo bin/kurtosis-tc.sh -e --delay=200ms
+```
 
+Individual containers can also be changed by name pattern. E.g.
 ```
-sudo bin/kurtosis-tc.sh "downlink=50mbit&uplink=20mbit&delay=50ms"
+sudo bin/kurtosis-tc.sh -i "^cl-0*1" --delay=100ms
 ```
-
-```
-sudo bin/kurtosis-tc.sh "delay=200ms"
-```
+Note: "0*" because numbering scheme uses digits based on the number of clients.
 
 For more details, see [the presentation](https://drive.google.com/file/d/1t4FW6CjdA0W54t9Z0z880PBTJt_2I8tM/view?usp=drive_link).
 
