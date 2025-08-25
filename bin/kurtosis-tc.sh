@@ -190,11 +190,11 @@ while read -r CONTAINER_ID; do
             EXCLUDE_PORTS=$(kurtosis_container_get_ports_except "$CONTAINER_ID" "tcp-discovery udp-discovery quic-discovery")
             echo "excluding ports from shaping: $EXCLUDE_PORTS"
             qdisc_filter_by_port "$NETWORK_INTERFACE_NAME" $EXCLUDE_PORTS
-            if [ ! -z "$NETM_OPTIONS" ]; then
-                qdisc_netm "$NETWORK_INTERFACE_NAME" $NETM_OPTIONS
-            fi
             if [ ! -z "$DOWNLINK_TBF_OPTIONS" ]; then
                 qdisc_tbf "$NETWORK_INTERFACE_NAME" $DOWNLINK_TBF_OPTIONS
+            fi
+            if [ ! -z "$NETM_OPTIONS" ]; then
+                qdisc_netm "$NETWORK_INTERFACE_NAME" $NETM_OPTIONS
             fi
             echo "Set ${OPTIONS_LOG} on $NETWORK_INTERFACE_NAME"
             echo "Controlling traffic of the container $(docker_container_get_name "$CONTAINER_ID") on $NETWORK_INTERFACE_NAME"
