@@ -210,8 +210,12 @@ while read -r CONTAINER_ID; do
 
     IF="eth0"
     # delete existing qdisc
-    docker_container_internal_netns_exec "$CONTAINER_ID" \
-        tc qdisc del dev "$IF" root
+    if ! docker_container_internal_netns_exec "$CONTAINER_ID" \
+        tc qdisc show dev "$IF" root | grep -q "noqueue" ; then
+
+        docker_container_internal_netns_exec "$CONTAINER_ID" \
+            tc qdisc del dev "$IF" root
+    fi
 
     if [ ! -z "$UPLINK_TBF_OPTIONS" ] || [ ! -z "$NETM_OPTIONS" ]; then
         # add uplink limits

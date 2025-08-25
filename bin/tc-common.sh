@@ -6,7 +6,7 @@ tc_init() {
     QDISC_HANDLE="root handle $QDISC_ID:"
 }
 qdisc_del() {
-    tc qdisc del dev "$1" root
+    tc qdisc show dev "$1" root | grep -q "noqueue" || tc qdisc del dev "$1" root
 }
 qdisc_next() {
     CLASS=$1
