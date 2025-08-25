@@ -64,17 +64,17 @@ get_el_containers
 echo "CL containers:"
 get_cl_containers
 
-#process commmand line arguments
+#process command line arguments
 # Options
 # -e: apply to EL containers
 # -c: apply to CL containers
-# -i: include also containers with this pattern in their name
-# --delay: set delay
-# --loss: set loss
-# --corrupt: set corrupt
-# --duplicate: set duplicate
-# --reorder: set reorder
-# --downlink: set downlink rate
+# -i: include also containers with this pattern in their name (e.g., ^el-0*1)
+# --delay: set one way delay (e.g., 50ms)
+# --loss: set loss (e.g., 1%)
+# --corrupt: set corrupt (e.g., 0.1%)
+# --duplicate: set duplicate (e.g., 0.1%)
+# --reorder: set reorder (e.g., 0.1%)
+# --downlink: set downlink rate (e.g., 50mbit)
 # --uplink: set uplink rate
 # --help: show this help message
 show_help() {
