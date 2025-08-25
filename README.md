@@ -9,7 +9,7 @@ and it is meant to be used with the [Ethereum Kurtosis package](https://github.c
 First, run Kurtosis to set up your local test network.
 
 ```
-kurtosis run github.com/ethpandaops/ethereum-package --args-file downloaded_demo_config.yaml
+kurtosis run github.com/ethpandaops/ethereum-package --args-file kurtosis-example.yaml
 ```
 
 Control EL node resources by setting uplink, downlink, and/or delay at any time. Changes are applied immediately.

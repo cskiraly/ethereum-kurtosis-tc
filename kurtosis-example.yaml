@@ -1,0 +1,45 @@
+# Example kurtosis config with
+# - Geth and Lighthouse, 3 nodes in total
+# - 16 blobs per slot, from a single wallet, all sent to node 1
+# - nodes and extra services over fixed ports to simplify GUI access
+
+participants:
+  - el_type: geth
+    cl_type: lighthouse
+    supernode: true
+    count: 3
+
+network_params:
+  fulu_fork_epoch: 1
+  bpo_1_epoch: 2
+  bpo_1_max_blobs: 24
+  bpo_1_target_blobs: 24
+  withdrawal_type: "0x02"
+  genesis_delay: 40
+
+additional_services:
+  - dora
+  - spamoor
+  - prometheus
+  - grafana
+
+spamoor_params:
+  spammers:
+    - scenario: blobs
+      config:
+        throughput: 24 # generate max 24 blobs per second. Won't be reached, see below 
+        max_wallets: 1  # use only 1 wallet
+        max_pending: 16 # do not try to queue more than 16 transactions in the mempool
+        client_group: "1" # send all blobs to node 1
+        log_txs: true # extra logging
+
+port_publisher:
+  #nat_exit_ip: "auto" # not working without hairpin NAT
+  el:
+    enabled: true
+  cl:
+    enabled: true
+  additional_services:
+    enabled: true
+  other:
+    enabled: true
