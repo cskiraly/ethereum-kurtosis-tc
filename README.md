@@ -16,6 +16,7 @@ Control EL node resources by setting uplink, downlink, and/or delay at any time.
 ```
 sudo bin/kurtosis-tc.sh -e --downlink=50mbit --uplink=20mbit --delay=50ms
 ```
+Note: use "mbit", which means Megabits/sec. "Mbps" would mean MegaBYTEs/sec.
 
 Parameters are optional: if not specified, values are reset to non-limited on every new invocation.
 ```
@@ -24,7 +25,7 @@ sudo bin/kurtosis-tc.sh -e --delay=200ms
 
 Individual containers can also be changed by name pattern. E.g.
 ```
-sudo bin/kurtosis-tc.sh -i "^cl-0*1" --delay=100ms
+sudo bin/kurtosis-tc.sh -i "^cl-0*1" --uplink=10mbit
 ```
 Note: "0*" because numbering scheme uses digits based on the number of clients.
 
