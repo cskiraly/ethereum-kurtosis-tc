@@ -83,6 +83,7 @@ show_help() {
     echo "  -e, --el                  Apply to EL containers"
     echo "  -c, --cl                  Apply to CL containers"
     echo "  -i, --include PATTERN     Include containers with this pattern in their name"
+    echo "  -d, --delete              Remove traffic control"
     echo "  --delay DELAY             Set delay (e.g., 50ms)"
     echo "  --loss LOSS               Set loss (e.g., 1%)"
     echo "  --corrupt CORRUPT         Set corrupt (e.g., 0.1%)"
@@ -99,11 +100,12 @@ UPLINK_TBF_OPTIONS=
 OPTIONS_LOG=
 
 # Parse command line arguments using getopts
-while getopts "eci:-:" opt; do
+while getopts "eci:d-:" opt; do
     case $opt in
         e) EL_CONTAINERS=true ;;
         c) CL_CONTAINERS=true ;;
         i) INCLUDE_PATTERN="$OPTARG" ;;
+        d) DELETE=true ;;
         -)
             case $OPTARG in
                 el) EL_CONTAINERS=true ;;
@@ -152,7 +154,7 @@ echo "NETM_OPTIONS: $NETM_OPTIONS"
 echo "DOWNLINK_TBF_OPTIONS: $DOWNLINK_TBF_OPTIONS"
 echo "UPLINK_TBF_OPTIONS: $UPLINK_TBF_OPTIONS"
 
-if [ -z "$NETM_OPTIONS" ] && [ -z "$DOWNLINK_TBF_OPTIONS" ] && [ -z "$UPLINK_TBF_OPTIONS" ]; then
+if [ -z "$NETM_OPTIONS" ] && [ -z "$DOWNLINK_TBF_OPTIONS" ] && [ -z "$UPLINK_TBF_OPTIONS" ] && [ -z "$DELETE" ]; then
     echo "Notice: Nothing to do"
     exit 0
 fi
@@ -187,17 +189,19 @@ while read -r CONTAINER_ID; do
             tc_init
             qdisc_del "$NETWORK_INTERFACE_NAME"
 
-            EXCLUDE_PORTS=$(kurtosis_container_get_ports_except "$CONTAINER_ID" "tcp-discovery udp-discovery quic-discovery")
-            echo "excluding ports from shaping: $EXCLUDE_PORTS"
-            qdisc_filter_by_port "$NETWORK_INTERFACE_NAME" $EXCLUDE_PORTS
-            if [ ! -z "$DOWNLINK_TBF_OPTIONS" ]; then
-                qdisc_tbf "$NETWORK_INTERFACE_NAME" $DOWNLINK_TBF_OPTIONS
+            if [ ! -z "$DOWNLINK_TBF_OPTIONS" ] || [ ! -z "$NETM_OPTIONS" ]; then
+                EXCLUDE_PORTS=$(kurtosis_container_get_ports_except "$CONTAINER_ID" "tcp-discovery udp-discovery quic-discovery")
+                echo "excluding ports from shaping: $EXCLUDE_PORTS"
+                qdisc_filter_by_port "$NETWORK_INTERFACE_NAME" $EXCLUDE_PORTS
+                if [ ! -z "$DOWNLINK_TBF_OPTIONS" ]; then
+                    qdisc_tbf "$NETWORK_INTERFACE_NAME" $DOWNLINK_TBF_OPTIONS
+                fi
+                if [ ! -z "$NETM_OPTIONS" ]; then
+                    qdisc_netm "$NETWORK_INTERFACE_NAME" $NETM_OPTIONS
+                fi
+                echo "Set ${OPTIONS_LOG} on $NETWORK_INTERFACE_NAME"
+                echo "Controlling traffic of the container $(docker_container_get_name "$CONTAINER_ID") on $NETWORK_INTERFACE_NAME"
             fi
-            if [ ! -z "$NETM_OPTIONS" ]; then
-                qdisc_netm "$NETWORK_INTERFACE_NAME" $NETM_OPTIONS
-            fi
-            echo "Set ${OPTIONS_LOG} on $NETWORK_INTERFACE_NAME"
-            echo "Controlling traffic of the container $(docker_container_get_name "$CONTAINER_ID") on $NETWORK_INTERFACE_NAME"
         done < <(echo -e "$NETWORK_INTERFACE_NAMES")
     done < <(echo -e "$CONTAINER_NETWORKS")
 
@@ -208,7 +212,6 @@ while read -r CONTAINER_ID; do
     # delete existing qdisc
     docker_container_internal_netns_exec "$CONTAINER_ID" \
         tc qdisc del dev "$IF" root
-    echo "deleted qdisc on $IF"
 
     if [ ! -z "$UPLINK_TBF_OPTIONS" ] || [ ! -z "$NETM_OPTIONS" ]; then
         # add uplink limits
