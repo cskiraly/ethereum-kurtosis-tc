@@ -12,7 +12,7 @@ First, run Kurtosis to set up your local test network.
 kurtosis run github.com/ethpandaops/ethereum-package --args-file kurtosis-example.yaml
 ```
 
-Control EL node resources by setting uplink, downlink, and/or delay at any time. Changes are applied immediately.
+Control EL (`-e`) or CL (`-c`) node resources by setting uplink, downlink, and/or delay at any time. Changes are applied immediately.
 ```
 sudo bin/kurtosis-tc.sh -e --downlink=50mbit --uplink=20mbit --delay=50ms
 ```
@@ -32,6 +32,12 @@ Note: "0*" because numbering scheme uses digits based on the number of clients.
 For more details, see [the presentation](https://drive.google.com/file/d/1t4FW6CjdA0W54t9Z0z880PBTJt_2I8tM/view?usp=drive_link).
 
 For other features of docker-tc, see the [original readme](https://github.com/lukaszlach/docker-tc).
+
+## Notes
+
+The script controls resources of ELs and CLs separately. This simplifies testing of one layer, since the other runs unconstrained.
+It is however not realistic because the EL and the CL usually runs on the same node and shares the bottleneck. While our tool
+could be extended in this direction, this is still TBD.
 
 ## Licence
 
