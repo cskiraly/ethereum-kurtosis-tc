@@ -210,7 +210,7 @@ while read -r CONTAINER_ID; do
         tc qdisc del dev "$IF" root
     echo "deleted qdisc on $IF"
 
-    if [ ! -z "$UPLINK_TBF_OPTIONS" ]; then
+    if [ ! -z "$UPLINK_TBF_OPTIONS" ] || [ ! -z "$NETM_OPTIONS" ]; then
         # add uplink limits
         # Set up classes to exclude control and measurement traffic:
         # fef2243b0595   el-1-geth-lighthouse                     engine-rpc: 8551/tcp -> 127.0.0.1:32001        RUNNING
@@ -235,9 +235,18 @@ while read -r CONTAINER_ID; do
         # send the rest to class 1:2 using matchall (we don't use 1:3)
         docker_container_internal_netns_exec "$CONTAINER_ID" \
             tc filter add dev "$IF" parent 1: prio 2 matchall classid 1:2
+        QDISC_HANDLE="parent 1:2 handle 20:"
         # add the tbf qdisc to class 1:2
-        docker_container_internal_netns_exec "$CONTAINER_ID" \
-            tc qdisc add dev "$IF" parent 1:2 handle 20: tbf burst 5kb latency 50ms $UPLINK_TBF_OPTIONS
+        if [ ! -z "$UPLINK_TBF_OPTIONS" ]; then
+            docker_container_internal_netns_exec "$CONTAINER_ID" \
+                tc qdisc add dev "$IF" $QDISC_HANDLE tbf burst 5kb latency 50ms $UPLINK_TBF_OPTIONS
+                QDISC_HANDLE="parent 20: handle 21:"
+        fi
+        # add delay on the uplink
+        if [ ! -z "$NETM_OPTIONS" ]; then
+            docker_container_internal_netns_exec "$CONTAINER_ID" \
+                tc qdisc add dev "$IF" $QDISC_HANDLE netem $NETM_OPTIONS
+        fi
     fi
 
 done < <(echo -e "$CONTAINER_IDS")
