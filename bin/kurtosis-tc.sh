@@ -4,6 +4,46 @@ SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 . "$SCRIPT_DIR/docker-common.sh"
 . "$SCRIPT_DIR/tc-common.sh"
 
+# get port from labels for selected services
+kurtosis_container_get_ports() {
+    CONTAINER_ID="$1"
+    shift
+    SERVICES="$@"
+    SERVICE_PORTS=$(docker inspect --format='{{(index .Config.Labels "com.kurtosistech.ports")}}' "$CONTAINER_ID")
+    # the format we get is like "rpc:8545/TCP,ws:8546/TCP,metrics:9001/TCP/http,tcp-discovery:32000/TCP,udp-discovery:32000/UDP,engine-rpc:8551/TCP"
+    for SERVICE in $SERVICES; do
+        PORT=$(echo "$SERVICE_PORTS" | grep -oP "(^|,)$SERVICE:\K\d+" | head -n 1)
+        # if [ -z "$PORT" ]; then
+        #     echo "Warning: No port found for container $CONTAINER_ID, service $SERVICE" >&2
+        # fi
+        PORTS="$PORTS $PORT"
+    done
+    echo "$PORTS"
+}
+
+# get ports from labels for all services, except the named ones
+# TODO: handle transports
+kurtosis_container_get_ports_except() {
+    CONTAINER_ID="$1"
+    shift
+    EXCLUDED_SERVICES="$@"
+
+    SERVICE_PORTS=$(docker inspect --format='{{(index .Config.Labels "com.kurtosistech.ports")}}' "$CONTAINER_ID")
+    # the format we get is like "rpc:8545/TCP,ws:8546/TCP,metrics:9001/TCP/http,tcp-discovery:32000/TCP,udp-discovery:32000/UDP,engine-rpc:8551/TCP"
+    # split the string to service, port tuples
+    IFS=',' read -ra SPA <<< "$SERVICE_PORTS"
+    for SP in "${SPA[@]}"; do
+        SERVICE_NAME=$(echo "$SP" | cut -d':' -f1)
+        SERVICE_PORT=$(echo "$SP" | cut -d':' -f2 | cut -d'/' -f1)
+
+        # Check for exact match in excluded services
+        if [[ ! " $EXCLUDED_SERVICES " =~ (^| )"$SERVICE_NAME"( |$) ]]; then
+            PORTS="$PORTS $SERVICE_PORT"
+        fi
+    done
+    echo "$PORTS"
+}
+
 # get id of all EL containers
 get_el_containers() {
     docker ps -q --filter "name=^el-"
@@ -147,7 +187,9 @@ while read -r CONTAINER_ID; do
             tc_init
             qdisc_del "$NETWORK_INTERFACE_NAME"
 
-            qdisc_filter_by_port "$NETWORK_INTERFACE_NAME"
+            EXCLUDE_PORTS=$(kurtosis_container_get_ports_except "$CONTAINER_ID" "tcp-discovery udp-discovery quic-discovery")
+            echo "excluding ports from shaping: $EXCLUDE_PORTS"
+            qdisc_filter_by_port "$NETWORK_INTERFACE_NAME" $EXCLUDE_PORTS
             if [ ! -z "$NETM_OPTIONS" ]; then
                 qdisc_netm "$NETWORK_INTERFACE_NAME" $NETM_OPTIONS
             fi
@@ -166,6 +208,7 @@ while read -r CONTAINER_ID; do
     # delete existing qdisc
     docker_container_internal_netns_exec "$CONTAINER_ID" \
         tc qdisc del dev "$IF" root
+    echo "deleted qdisc on $IF"
 
     if [ ! -z "$UPLINK_TBF_OPTIONS" ]; then
         # add uplink limits
@@ -180,9 +223,10 @@ while read -r CONTAINER_ID; do
         docker_container_internal_netns_exec "$CONTAINER_ID" \
             tc qdisc add dev "$IF" root handle 1: prio
         # exclude engine-rpc, rpc, ws, metrics by sending to class 1:1
-        # TODO: get ports from labels
-        exclude_ports="8551 8545 8546 9001"
-        for port in $exclude_ports; do
+        # EXCLUDE_PORTS=$(kurtosis_container_get_ports "$CONTAINER_ID" "engine-rpc rpc ws metrics http ")
+        EXCLUDE_PORTS=$(kurtosis_container_get_ports_except "$CONTAINER_ID" "tcp-discovery udp-discovery quic-discovery")
+        echo "excluding ports from shaping: $EXCLUDE_PORTS"
+        for port in $EXCLUDE_PORTS; do
             docker_container_internal_netns_exec "$CONTAINER_ID" \
                 tc filter add dev "$IF" protocol ip parent 1: prio 1 u32 match ip sport $port 0xffff flowid 1:1
             docker_container_internal_netns_exec "$CONTAINER_ID" \

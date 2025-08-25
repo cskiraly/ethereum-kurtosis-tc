@@ -15,6 +15,8 @@ qdisc_next() {
 }
 qdisc_filter_by_port() {
     IF="$1"
+    shift
+    exclude_ports="$@"
     # add a prio qdisc to split traffic, using
     # - class 1:1 for protected control traffic
     # - class 1:2 for shaped traffic
@@ -30,7 +32,6 @@ qdisc_filter_by_port() {
     tc qdisc add dev "$IF" $QDISC_HANDLE prio
     # exclude engine-rpc, rpc, ws, metrics by sending to class 1:1
     # TODO: get ports from labels
-    exclude_ports="8551 8545 8546 9001"
     for port in $exclude_ports; do
         tc filter add dev "$IF" protocol ip parent 1: prio 1 u32 match ip sport $port 0xffff flowid 1:1
         tc filter add dev "$IF" protocol ip parent 1: prio 1 u32 match ip dport $port 0xffff flowid 1:1
