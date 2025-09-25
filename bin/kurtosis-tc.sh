@@ -111,6 +111,7 @@ while getopts "eci:d-:" opt; do
                 el) EL_CONTAINERS=true ;;
                 cl) CL_CONTAINERS=true ;;
                 include=*) INCLUDE_PATTERN=${OPTARG#*=} ;;
+                delete) DELETE=true ;;
                 delay=*) NETM_OPTIONS+="delay ${OPTARG#*=} " ;;
                 loss=*) NETM_OPTIONS+="loss ${OPTARG#*=} " ;;
                 corrupt=*) NETM_OPTIONS+="corrupt ${OPTARG#*=} " ;;
